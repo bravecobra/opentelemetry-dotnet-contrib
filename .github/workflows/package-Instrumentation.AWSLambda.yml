@@ -1,4 +1,4 @@
-name: Pack OpenTelemetry.Contrib.Instrumentation.Wcf
+name: Pack OpenTelemetry.Contrib.Instrumentation.AWSLambda
 
 on:
   workflow_dispatch:
@@ -9,13 +9,13 @@ on:
         default: 'warning'
   push:
     tags:
-      - 'Instrumentation.Wcf-*'
+      - 'Instrumentation.AWSLambda-*' # trigger when we create a tag with prefix "Instrumentation.AWSLambda-"
 
 jobs:
   build-test-pack:
     runs-on: ${{ matrix.os }}
     env:
-      PROJECT: OpenTelemetry.Contrib.Instrumentation.Wcf
+      PROJECT: OpenTelemetry.Contrib.Instrumentation.AWSLambda
 
     strategy:
       matrix:
@@ -44,7 +44,6 @@ jobs:
         name: ${{env.PROJECT}}-packages
         path: '**/${{env.PROJECT}}/bin/**/*.*nupkg'
 
-    - name: Publish MyGet
+    - name: Publish Nuget
       run: |
-        nuget setApiKey ${{ secrets.MYGET_TOKEN }} -Source https://www.myget.org/F/opentelemetry-contrib/api/v2/package
-        nuget push **/${{env.PROJECT}}/bin/**/*.nupkg -Source https://www.myget.org/F/opentelemetry-contrib/api/v2/package
+        nuget push **/${{env.PROJECT}}/bin/**/*.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey ${{ secrets.NUGET_TOKEN }} -SymbolApiKey ${{ secrets.NUGET_TOKEN }}

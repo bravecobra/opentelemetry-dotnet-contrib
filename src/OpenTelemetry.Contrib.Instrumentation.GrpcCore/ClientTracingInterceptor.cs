@@ -131,7 +131,11 @@ namespace OpenTelemetry.Contrib.Instrumentation.GrpcCore
             {
                 rpcScope = new ClientRpcScope<TRequest, TResponse>(context, this.options);
                 var responseContinuation = continuation(rpcScope.Context);
-                var clientRequestStreamProxy = new ClientStreamWriterProxy<TRequest>(responseContinuation.RequestStream, rpcScope.RecordRequest);
+                var clientRequestStreamProxy = new ClientStreamWriterProxy<TRequest>(
+                    responseContinuation.RequestStream,
+                    rpcScope.RecordRequest,
+                    onException: rpcScope.CompleteWithException);
+
                 var responseAsync = responseContinuation.ResponseAsync.ContinueWith(
                     responseTask =>
                     {
@@ -220,7 +224,8 @@ namespace OpenTelemetry.Contrib.Instrumentation.GrpcCore
 
                 var requestStreamProxy = new ClientStreamWriterProxy<TRequest>(
                     responseContinuation.RequestStream,
-                    rpcScope.RecordRequest);
+                    rpcScope.RecordRequest,
+                    onException: rpcScope.CompleteWithException);
 
                 var responseStreamProxy = new AsyncStreamReaderProxy<TResponse>(
                     responseContinuation.ResponseStream,
@@ -319,10 +324,19 @@ namespace OpenTelemetry.Contrib.Instrumentation.GrpcCore
 
                 var callOptions = context.Options;
 
-                if (callOptions.Headers == null)
+                // Do NOT mutate incoming call headers, make a new copy.
+                // Retry mechanisms that may sit above this interceptor rely on an original set of call headers.
+                var metadata = new Metadata();
+                if (callOptions.Headers != null)
                 {
-                    callOptions = callOptions.WithHeaders(new Metadata());
+                    for (var i = 0; i < callOptions.Headers.Count; i++)
+                    {
+                        metadata.Add(callOptions.Headers[i]);
+                    }
                 }
+
+                // replace the CallOptions
+                callOptions = callOptions.WithHeaders(metadata);
 
                 this.SetActivity(rpcActivity);
                 options.Propagator.Inject(new PropagationContext(rpcActivity.Context, Baggage.Current), callOptions.Headers, MetadataSetter);
